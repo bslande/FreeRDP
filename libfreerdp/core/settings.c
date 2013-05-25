@@ -240,6 +240,8 @@ rdpSettings* freerdp_settings_new(void* instance)
 		settings->ServerPort = 3389;
 		settings->DesktopResize = TRUE;
 		settings->ToggleFullscreen = TRUE;
+		settings->DesktopPosX = 0;
+		settings->DesktopPosY = 0;
 
 		settings->PerformanceFlags =
 				PERF_DISABLE_FULLWINDOWDRAG |
@@ -375,7 +377,7 @@ rdpSettings* freerdp_settings_new(void* instance)
 
 		settings->VirtualChannelChunkSize = CHANNEL_CHUNK_LENGTH;
 
-		settings->MultifragMaxRequestSize = 0x200000;
+		settings->MultifragMaxRequestSize = 0xFFFF;
 
 		settings->GatewayUseSameCredentials = TRUE;
 
