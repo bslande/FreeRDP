@@ -54,8 +54,8 @@
 #define SEC_ENCRYPT						0x0008
 #define SEC_RESET_SEQNO						0x0010
 #define SEC_IGNORE_SEQNO					0x0020
-#define	 SEC_INFO_PKT						0x0040
-#define	 SEC_LICENSE_PKT					0x0080
+#define	SEC_INFO_PKT						0x0040
+#define	SEC_LICENSE_PKT						0x0080
 #define SEC_LICENSE_ENCRYPT_CS					0x0200
 #define SEC_LICENSE_ENCRYPT_SC					0x0200
 #define SEC_REDIRECTION_PKT					0x0400
@@ -156,6 +156,7 @@ struct rdp_rdp
 	UINT32 errorInfo;
 	UINT32 finalize_sc_pdus;
 	BOOL disconnect;
+	BOOL resendFocus;
 };
 
 BOOL rdp_read_security_header(wStream* s, UINT16* flags);

@@ -249,17 +249,16 @@ BOOL tls_accept(rdpTls* tls, const char* cert_file, const char* privatekey_file)
 
 	SSL_CTX_set_options(tls->ctx, options);
 
-	fprintf(stderr, "private key file: %s\n", privatekey_file);
-
 	if (SSL_CTX_use_RSAPrivateKey_file(tls->ctx, privatekey_file, SSL_FILETYPE_PEM) <= 0)
 	{
 		fprintf(stderr, "SSL_CTX_use_RSAPrivateKey_file failed\n");
+		fprintf(stderr, "PrivateKeyFile: %s\n", privatekey_file);
 		return FALSE;
 	}
 
 	tls->ssl = SSL_new(tls->ctx);
 
-	if (tls->ssl == NULL)
+	if (!tls->ssl)
 	{
 		fprintf(stderr, "SSL_new failed\n");
 		return FALSE;
@@ -273,7 +272,7 @@ BOOL tls_accept(rdpTls* tls, const char* cert_file, const char* privatekey_file)
 
 	cert = tls_get_certificate(tls, FALSE);
 
-	if (cert == NULL)
+	if (!cert)
 	{
 		fprintf(stderr, "tls_connect: tls_get_certificate failed to return the server certificate.\n");
 		return FALSE;
@@ -604,7 +603,7 @@ BOOL tls_verify_certificate(rdpTls* tls, CryptoCert cert, char* hostname)
 		else if (match == -1)
 		{
 			/* entry was found in known_hosts file, but fingerprint does not match. ask user to use it */
-			tls_print_certificate_error(hostname, fingerprint);
+			tls_print_certificate_error(hostname, fingerprint, tls->certificate_store->file);
 			
 			if (instance->VerifyChangedCertificate)
 				accept_certificate = instance->VerifyChangedCertificate(instance, subject, issuer, fingerprint, "");
@@ -645,7 +644,7 @@ BOOL tls_verify_certificate(rdpTls* tls, CryptoCert cert, char* hostname)
 	return verification_status;
 }
 
-void tls_print_certificate_error(char* hostname, char* fingerprint)
+void tls_print_certificate_error(char* hostname, char* fingerprint, char *hosts_file)
 {
 	fprintf(stderr, "The host key for %s has changed\n", hostname);
 	fprintf(stderr, "@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@\n");
@@ -656,7 +655,7 @@ void tls_print_certificate_error(char* hostname, char* fingerprint)
 	fprintf(stderr, "It is also possible that a host key has just been changed.\n");
 	fprintf(stderr, "The fingerprint for the host key sent by the remote host is\n%s\n", fingerprint);
 	fprintf(stderr, "Please contact your system administrator.\n");
-	fprintf(stderr, "Add correct host key in ~/.freerdp/known_hosts to get rid of this message.\n");
+	fprintf(stderr, "Add correct host key in %s to get rid of this message.\n", hosts_file);
 	fprintf(stderr, "Host key for %s has changed and you have requested strict checking.\n", hostname);
 	fprintf(stderr, "Host key verification failed.\n");
 }

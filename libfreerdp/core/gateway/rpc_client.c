@@ -35,6 +35,8 @@
 
 #include "rpc_client.h"
 
+#include "../rdp.h"
+
 wStream* rpc_client_fragment_pool_take(rdpRpc* rpc)
 {
 	wStream* fragment = NULL;
@@ -105,7 +107,7 @@ int rpc_client_on_fragment_received_event(rdpRpc* rpc)
 
 		Stream_EnsureCapacity(rpc->client->pdu->s, Stream_Length(fragment));
 		Stream_Write(rpc->client->pdu->s, buffer, Stream_Length(fragment));
-		Stream_Length(rpc->client->pdu->s) = Stream_Position(rpc->client->pdu->s);
+		Stream_Length(rpc->client->pdu->s) = Stream_GetPosition(rpc->client->pdu->s);
 
 		rpc_client_fragment_pool_return(rpc, fragment);
 
@@ -156,6 +158,15 @@ int rpc_client_on_fragment_received_event(rdpRpc* rpc)
 	if (StubLength == 4)
 	{
 		//fprintf(stderr, "Ignoring TsProxySendToServer Response\n");
+        printf("Got stub length 4 with flags %d and callid %d\n", header->common.pfc_flags, header->common.call_id);
+        
+        /* received a disconnect request from the server? */
+        if (header->common.call_id == rpc->PipeCallId && header->common.pfc_flags & PFC_LAST_FRAG)
+        {
+            ((freerdp*)rpc->settings->instance)->context->rdp->disconnect = TRUE;
+            ((freerdp*)rpc->settings->instance)->context->rdp->transport->tsg->state = TSG_STATE_TUNNEL_CLOSE_PENDING;            
+        }
+        
 		rpc_client_fragment_pool_return(rpc, fragment);
 		return 0;
 	}
@@ -195,7 +206,7 @@ int rpc_client_on_fragment_received_event(rdpRpc* rpc)
 		rpc->client->pdu->Flags = RPC_PDU_FLAG_STUB;
 		rpc->client->pdu->CallId = rpc->StubCallId;
 
-		Stream_Length(rpc->client->pdu->s) = Stream_Position(rpc->client->pdu->s);
+		Stream_Length(rpc->client->pdu->s) = Stream_GetPosition(rpc->client->pdu->s);
 
 		rpc->StubFragCount = 0;
 		rpc->StubCallId = 0;
@@ -219,12 +230,12 @@ int rpc_client_on_read_event(rdpRpc* rpc)
 	if (!rpc->client->RecvFrag)
 		rpc->client->RecvFrag = rpc_client_fragment_pool_take(rpc);
 
-	position = Stream_Position(rpc->client->RecvFrag);
+	position = Stream_GetPosition(rpc->client->RecvFrag);
 
-	if (Stream_Position(rpc->client->RecvFrag) < RPC_COMMON_FIELDS_LENGTH)
+	if (Stream_GetPosition(rpc->client->RecvFrag) < RPC_COMMON_FIELDS_LENGTH)
 	{
 		status = rpc_out_read(rpc, Stream_Pointer(rpc->client->RecvFrag),
-				RPC_COMMON_FIELDS_LENGTH - Stream_Position(rpc->client->RecvFrag));
+				RPC_COMMON_FIELDS_LENGTH - Stream_GetPosition(rpc->client->RecvFrag));
 
 		if (status < 0)
 		{
@@ -235,7 +246,7 @@ int rpc_client_on_read_event(rdpRpc* rpc)
 		Stream_Seek(rpc->client->RecvFrag, status);
 	}
 
-	if (Stream_Position(rpc->client->RecvFrag) >= RPC_COMMON_FIELDS_LENGTH)
+	if (Stream_GetPosition(rpc->client->RecvFrag) >= RPC_COMMON_FIELDS_LENGTH)
 	{
 		header = (rpcconn_common_hdr_t*) Stream_Buffer(rpc->client->RecvFrag);
 
@@ -243,14 +254,14 @@ int rpc_client_on_read_event(rdpRpc* rpc)
 		{
 			fprintf(stderr, "rpc_client_frag_read: invalid fragment size: %d (max: %d)\n",
 					header->frag_length, rpc->max_recv_frag);
-			winpr_HexDump(Stream_Buffer(rpc->client->RecvFrag), Stream_Position(rpc->client->RecvFrag));
+			winpr_HexDump(Stream_Buffer(rpc->client->RecvFrag), Stream_GetPosition(rpc->client->RecvFrag));
 			return -1;
 		}
 
-		if (Stream_Position(rpc->client->RecvFrag) < header->frag_length)
+		if (Stream_GetPosition(rpc->client->RecvFrag) < header->frag_length)
 		{
 			status = rpc_out_read(rpc, Stream_Pointer(rpc->client->RecvFrag),
-					header->frag_length - Stream_Position(rpc->client->RecvFrag));
+					header->frag_length - Stream_GetPosition(rpc->client->RecvFrag));
 
 			if (status < 0)
 			{
@@ -269,13 +280,13 @@ int rpc_client_on_read_event(rdpRpc* rpc)
 	if (status < 0)
 		return -1;
 
-	status = Stream_Position(rpc->client->RecvFrag) - position;
+	status = Stream_GetPosition(rpc->client->RecvFrag) - position;
 
-	if (Stream_Position(rpc->client->RecvFrag) >= header->frag_length)
+	if (Stream_GetPosition(rpc->client->RecvFrag) >= header->frag_length)
 	{
 		/* complete fragment received */
 
-		Stream_Length(rpc->client->RecvFrag) = Stream_Position(rpc->client->RecvFrag);
+		Stream_Length(rpc->client->RecvFrag) = Stream_GetPosition(rpc->client->RecvFrag);
 		Stream_SetPosition(rpc->client->RecvFrag, 0);
 
 		Queue_Enqueue(rpc->client->FragmentQueue, rpc->client->RecvFrag);
